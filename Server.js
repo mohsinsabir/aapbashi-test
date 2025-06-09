@@ -24,9 +24,15 @@ console.log("🔍 Connecting to MongoDB Atlas...");
 
 const app = express();
 app.use(cors({
-  origin: '*',
+  origin: [
+    'https://aapbashi-test-production.up.railway.app', // Railway backend
+    'http://localhost:3000', // Local development
+    'exp://localhost:19000', // Expo development
+    'exp://192.168.1.14:19000', // Expo on local network
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true // Allow credentials (cookies, authorization headers, etc.)
 }));
 app.use(express.json());
 
@@ -339,6 +345,93 @@ app.post("/register", async (req, res) => {
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ success: false, message: "Server error during registration." });
+  }
+});
+
+// API Endpoints for Fields
+app.post("/getfield", async (req, res) => {
+  const { userId } = req.body;
+  console.log("Fetching fields for userId:", userId);
+
+  if (!userId) {
+    return res.status(400).json({ success: false, message: "User ID is required." });
+  }
+
+  try {
+    const client = await connectToDatabase();
+    const database = client.db(dbName);
+    const fieldsCollection = database.collection("Fields"); // Assuming your collection is named "Fields"
+
+    const fields = await fieldsCollection.find({ userId: userId }).toArray();
+    console.log(`Found ${fields.length} fields for userId: ${userId}`);
+
+    res.status(200).json({ success: true, fields: fields });
+  } catch (error) {
+    console.error("Error fetching fields:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch fields.", error: error.message });
+  }
+});
+
+app.post("/savefield", async (req, res) => {
+  const { fieldName, cropTypes, soilType, location, userId } = req.body;
+  console.log("Saving new field:", { fieldName, cropTypes, soilType, location, userId });
+
+  if (!fieldName || !cropTypes || !soilType || !location || !userId) {
+    return res.status(400).json({ success: false, message: "All field data (fieldName, cropTypes, soilType, location, userId) are required." });
+  }
+
+  try {
+    const client = await connectToDatabase();
+    const database = client.db(dbName);
+    const fieldsCollection = database.collection("Fields"); // Assuming your collection is named "Fields"
+
+    const newField = {
+      fieldName,
+      cropTypes,
+      soilType,
+      location,
+      userId,
+      createdAt: new Date(),
+    };
+
+    await fieldsCollection.insertOne(newField);
+    console.log("New field saved:", newField);
+
+    res.status(201).json({ success: true, message: "Field saved successfully." });
+  } catch (error) {
+    console.error("Error saving field:", error);
+    res.status(500).json({ success: false, message: "Failed to save field.", error: error.message });
+  }
+});
+
+// API Endpoint for deleting a field
+app.post("/deletefield", async (req, res) => {
+  const { _id } = req.body;
+  console.log("Attempting to delete field with _id:", _id);
+
+  if (!_id) {
+    return res.status(400).json({ success: false, message: "Field ID (_id) is required for deletion." });
+  }
+
+  try {
+    const client = await connectToDatabase();
+    const database = client.db(dbName);
+    const fieldsCollection = database.collection("Fields");
+
+    // Convert _id string to MongoDB ObjectId
+    const ObjectId = require('mongodb').ObjectId; // Make sure ObjectId is imported or available
+    const result = await fieldsCollection.deleteOne({ _id: new ObjectId(_id) });
+
+    if (result.deletedCount === 1) {
+      console.log("Field deleted successfully:", _id);
+      res.status(200).json({ success: true, message: "Field deleted successfully." });
+    } else {
+      console.log("Field not found or not deleted:", _id);
+      res.status(404).json({ success: false, message: "Field not found or could not be deleted." });
+    }
+  } catch (error) {
+    console.error("Error deleting field:", error);
+    res.status(500).json({ success: false, message: "Failed to delete field.", error: error.message });
   }
 });
 
