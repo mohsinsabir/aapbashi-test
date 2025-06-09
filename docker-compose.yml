@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - VEEVO_API_KEY=${VEEVO_API_KEY}
+      - MONGODB_URI=${MONGODB_URI}
+    restart: unless-stopped 
